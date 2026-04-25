@@ -11,7 +11,7 @@ ifeq ($(OS),Windows_NT)
 	RM_CMD = if exist __pycache__ rmdir /s /q __pycache__
 else
 	PYTHON = $(VENV_DIR)/bin/python
-	VENV_CREATE = python3 -m venv $(VENV_DIR) || python -m venv $(VENV_DIR)
+	VENV_CREATE = python3.11 -m venv $(VENV_DIR) || python3 -m venv $(VENV_DIR) || python -m venv $(VENV_DIR)
 	RM_CMD = rm -rf __pycache__
 endif
 
