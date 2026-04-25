@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+_cover_tmp.pdf
+_content_tmp.pdf
+.DS_Store
+Thumbs.db
+bilan.txt
+generate_rapport.py
