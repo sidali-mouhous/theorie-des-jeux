@@ -145,13 +145,39 @@ def selection_screen(screen: pygame.Surface, fonts: dict) -> dict:
         pygame.draw.rect(screen, play_bg, play_r, border_radius=12)
         pygame.draw.rect(screen, (255, 255, 255) if play_hov else (180, 180, 180),
                          play_r, 2, border_radius=12)
-        icon_s = fonts['md'].render("▶", True, BG)
-        lbl_s  = fonts['md'].render("JOUER", True, BG)
-        total_w = icon_s.get_width() + 10 + lbl_s.get_width()
-        ix = play_r.centerx - total_w // 2
-        iy = play_r.centery - icon_s.get_height() // 2
-        screen.blit(icon_s, (ix, iy))
-        screen.blit(lbl_s,  (ix + icon_s.get_width() + 10, iy))
+
+        # ── Icône Play dessinée ──
+        icon_x = play_r.centerx - 55
+        icon_y = play_r.centery
+
+        pygame.draw.circle(
+            screen,
+            (255, 255, 255),
+            (icon_x, icon_y),
+            16
+        )
+
+        pygame.draw.polygon(
+            screen,
+            BG,
+            [
+                (icon_x - 4, icon_y - 7),
+                (icon_x - 4, icon_y + 7),
+                (icon_x + 8, icon_y),
+            ]
+        )
+
+        # ── Texte ──
+        lbl_s = fonts['md'].render("JOUER", True, BG)
+
+        screen.blit(
+            lbl_s,
+            (
+                play_r.centerx - lbl_s.get_width() // 2 + 20,
+                play_r.centery - lbl_s.get_height() // 2
+            )
+)
+
 
         pygame.display.flip()
         clock.tick(60)
