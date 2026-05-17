@@ -40,6 +40,9 @@ PANEL_BG    = (24,  24,  38)
 TEXT_CLR    = (210, 210, 230)
 TEXT_DIM    = (100, 100, 130)
 ACCENT      = (120, 200, 100)
+BUTTON_HOVER_BG = ( 50,  55,  80)   # survol bouton menu
+GOLD            = (220, 185,  40)   # bannière victoire
+SECTION_BG      = ( 22,  22,  38)   # fond carte section menu
 
 # Polices (chargées dans main)
 FONT_SM = 16

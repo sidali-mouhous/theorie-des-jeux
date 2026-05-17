@@ -1,6 +1,7 @@
 # ─────────────────────────────────────────────
 #  Quoridor — Rendu visuel du plateau (V3)
 # ─────────────────────────────────────────────
+import math
 import pygame
 from constants import *
 
@@ -55,7 +56,7 @@ def draw_board(surface: pygame.Surface,
             elif pos in hovered_set:
                 clr = CELL_HOVER
             else:
-                clr = CELL_CLR
+                clr = CELL_CLR if (row + col) % 2 == 0 else (40, 42, 68)
 
             pygame.draw.rect(surface, clr, r, border_radius=6)
 
@@ -181,123 +182,163 @@ def draw_ai_preview(surface: pygame.Surface, action, horizontal: bool = True):
 
 # ── Panneau latéral ───────────────────────────
 def draw_panel(surface: pygame.Surface, fonts: dict, state: dict):
+    now   = pygame.time.get_ticks()
     px    = MARGIN + BOARD_PX + WALL_GAP + 20
     panel = pygame.Rect(px, MARGIN - WALL_GAP, 236, BOARD_PX + WALL_GAP * 2)
-    pygame.draw.rect(surface, PANEL_BG, panel, border_radius=10)
+
+    # Fond avec liseret supérieur animé
+    pygame.draw.rect(surface, PANEL_BG, panel, border_radius=12)
+    pulse_a = int(110 + 70 * math.sin(now / 900))
+    top_glow = pygame.Surface((panel.w - 4, 3), pygame.SRCALPHA)
+    top_glow.fill((*ACCENT[:3], pulse_a))
+    surface.blit(top_glow, (panel.x + 2, panel.y + 2))
 
     CX   = panel.centerx
     PADL = px + 12
     PADR = px + 224
-    SEP  = (45, 47, 70)
+    W    = PADR - PADL
 
-    def sep(y):
-        pygame.draw.line(surface, SEP, (PADL, y), (PADR, y), 1)
+    def sep_line(y):
+        sl = pygame.Surface((W, 1), pygame.SRCALPHA)
+        sl.fill((40, 42, 64, 100))
+        surface.blit(sl, (PADL, y))
 
-    # ── 1. TITRE (hauteur fixe : 56px) ─────────────────
-    y = panel.top + 12
-    t = fonts['lg'].render("QUORIDOR", True, ACCENT)
+    # ═══ 1. TITRE ANIMÉ ══════════════════════════════════
+    y = panel.top + 14
+    pulse = 0.80 + 0.20 * math.sin(now / 800)
+    tc_col = (int(ACCENT[0] * pulse), int(ACCENT[1] * pulse), int(ACCENT[2] * pulse))
+    t = fonts['lg'].render("QUORIDOR", True, tc_col)
     surface.blit(t, t.get_rect(centerx=CX, top=y))
-    y += t.get_height() + 2
+    y += t.get_height() + 3
     sub = fonts['sm'].render("Univ. Rouen  ·  M1 GIL-ITA", True, TEXT_DIM)
     surface.blit(sub, sub.get_rect(centerx=CX, top=y))
+    y += sub.get_height() + 14
 
-    sep(panel.top + 60)
+    sep_line(y); y += 10
 
-    # ── 2. SCORE SESSION (hauteur fixe : 26px) ─────────
-    y = panel.top + 68
+    # ═══ 2. SCORE SESSION ════════════════════════════════
     scores = state.get('scores', [0, 0])
-    sc = fonts['sm'].render(f"J1 : {scores[0]}   vs   J2 : {scores[1]}", True, TEXT_DIM)
-    surface.blit(sc, sc.get_rect(centerx=CX, top=y))
+    s1 = fonts['lg'].render(str(scores[0]), True, P1_CLR)
+    vs = fonts['sm'].render("vs", True, TEXT_DIM)
+    s2 = fonts['lg'].render(str(scores[1]), True, P2_CLR)
+    j1 = fonts['sm'].render("J1", True, P1_CLR)
+    j2 = fonts['sm'].render("J2", True, P2_CLR)
+    surface.blit(s1, s1.get_rect(right=CX - 14, centery=y + 18))
+    surface.blit(vs, vs.get_rect(centerx=CX,     centery=y + 18))
+    surface.blit(s2, s2.get_rect(left=CX  + 14, centery=y + 18))
+    surface.blit(j1, j1.get_rect(right=CX - 14, top=y + 36))
+    surface.blit(j2, j2.get_rect(left=CX  + 14, top=y + 36))
+    y += 56
 
-    sep(panel.top + 96)
+    sep_line(y); y += 12
 
-    # ── 3. TOUR (hauteur fixe : 30px) ──────────────────
-    y = panel.top + 104
-    turn      = state.get('turn', 1)
-    tc        = state.get('turn_count', 0)
-    clr_turn  = P1_CLR if turn == 1 else P2_CLR
-    tl = fonts['md'].render(f"Tour {tc + 1}  —  J{turn}", True, clr_turn)
-    surface.blit(tl, tl.get_rect(centerx=CX, top=y))
+    # ═══ 3. TOUR — indicateur circulaire animé ═══════════
+    turn     = state.get('turn', 1)
+    tc       = state.get('turn_count', 0)
+    clr_turn = P1_CLR if turn == 1 else P2_CLR
+    dark_t   = P1_DARK if turn == 1 else P2_DARK
 
-    sep(panel.top + 136)
+    pulse2    = 0.55 + 0.45 * math.sin(now / 500)
+    ccx       = PADL + 22
+    ccy       = y + 22
+    halo_s    = pygame.Surface((56, 56), pygame.SRCALPHA)
+    pygame.draw.circle(halo_s, (*clr_turn[:3], int(55 * pulse2)), (28, 28), 26)
+    surface.blit(halo_s, (ccx - 28, ccy - 28))
+    pygame.draw.circle(surface, dark_t,       (ccx, ccy + 2), 19)
+    pygame.draw.circle(surface, clr_turn,     (ccx, ccy),     17)
+    pygame.draw.circle(surface, (255,255,255),(ccx, ccy),     17, 1)
+    ln = fonts['sm'].render(str(turn), True, (255, 255, 255))
+    surface.blit(ln, ln.get_rect(center=(ccx, ccy)))
 
-    # ── 4. JOUEURS (hauteur fixe : 92px) ───────────────
+    t1 = fonts['md'].render(f"Tour {tc + 1}", True, TEXT_CLR)
+    t2 = fonts['sm'].render(f"Joueur {turn}", True, clr_turn)
+    surface.blit(t1, (PADL + 50, y + 6))
+    surface.blit(t2, (PADL + 50, y + 6 + t1.get_height() + 2))
+    y += 52
+
+    sep_line(y); y += 10
+
+    # ═══ 4. FICHES JOUEURS ════════════════════════════════
     dist = state.get('dist', [0, 0])
     for i, (clr, dark) in enumerate([(P1_CLR, P1_DARK), (P2_CLR, P2_DARK)]):
-        y = panel.top + 144 + i * 46
-        row_bg = pygame.Rect(PADL, y, PADR - PADL, 38)
-        pygame.draw.rect(surface, (30, 32, 52), row_bg, border_radius=6)
-        # pion
-        pygame.draw.circle(surface, dark, (PADL + 16, y + 19), 12)
-        pygame.draw.circle(surface, clr,  (PADL + 16, y + 19), 10)
+        is_active = (turn == i + 1)
+        card = pygame.Rect(PADL, y, W, 102)
+
+        # Fond et bordure de la carte
+        pygame.draw.rect(surface,
+                         (36, 38, 62) if is_active else (26, 28, 46),
+                         card, border_radius=10)
+        pygame.draw.rect(surface,
+                         clr if is_active else (34, 36, 56),
+                         card, 2 if is_active else 1, border_radius=10)
+
+        # Pion
+        pc = (card.left + 22, card.top + 24)
+        pygame.draw.circle(surface, dark,         (pc[0], pc[1] + 2), 16)
+        pygame.draw.circle(surface, clr,           pc,                 14)
+        lighter = tuple(min(c + 70, 255) for c in clr[:3])
+        pygame.draw.circle(surface, lighter,      (pc[0]-4, pc[1]-4),  5)
+        pygame.draw.circle(surface, (220,220,220), pc,                 14, 1)
+        lp = fonts['sm'].render(f"J{i+1}", True, (255, 255, 255))
+        surface.blit(lp, lp.get_rect(center=pc))
+
+        # Nom du joueur
+        nm = fonts['md'].render(f"Joueur {i+1}",
+                                True, clr if is_active else TEXT_CLR)
+        surface.blit(nm, (card.left + 46, card.top + 6))
+
+        # Icônes barrières
         w = state['walls'][i]
-        d = dist[i]
-        l1 = fonts['sm'].render(f"J{i+1}  ·  {w} barrière{'s' if w!=1 else ''}", True, TEXT_CLR)
-        l2 = fonts['sm'].render(f"dist. but : {d}", True, TEXT_DIM)
-        surface.blit(l1, (PADL + 34, y + 3))
-        surface.blit(l2, (PADL + 34, y + 21))
+        wl = fonts['sm'].render(f"{w}/10",
+                                True, TEXT_CLR if is_active else TEXT_DIM)
+        surface.blit(wl, (card.left + 46, card.top + 30))
+        for wi in range(WALLS_PER_PLAYER):
+            ic = WALL_CLR if wi < w else (30, 32, 52)
+            pygame.draw.rect(surface, ic,
+                             pygame.Rect(card.left + 46 + wi * 14,
+                                         card.top + 50, 10, 10),
+                             border_radius=2)
 
-    sep(panel.top + 238)
+        # Barre de progression vers la victoire
+        d   = dist[i]
+        prg = max(0.0, 1.0 - d / 16.0)
+        bx  = card.left + 10
+        by  = card.top + 76
+        bw  = W - 20
+        pygame.draw.rect(surface, (20, 22, 42),
+                         pygame.Rect(bx, by, bw, 8), border_radius=4)
+        fw = max(4, int(bw * prg))
+        bar_c = clr if is_active else tuple(c // 2 + 10 for c in clr[:3])
+        pygame.draw.rect(surface, bar_c,
+                         pygame.Rect(bx, by, fw, 8), border_radius=4)
+        dl = fonts['sm'].render(f"{d} cases", True, TEXT_DIM)
+        surface.blit(dl, dl.get_rect(right=card.right - 6, centery=by + 4))
 
-    # ── 5. STATUT / IA (hauteur fixe : 40px) ──────────
-    y = panel.top + 246
+        y += card.h + 8
+
+    y += 4
+    sep_line(y); y += 10
+
+    # ═══ 5. STATUT / IA ═══════════════════════════════════
     status = state.get('status', '')
     ai_lbl = state.get('ai_label', '')
     if status:
         s = fonts['sm'].render(status, True, ACCENT)
         surface.blit(s, s.get_rect(centerx=CX, top=y))
-        y += s.get_height() + 2
+        y += s.get_height() + 4
     if ai_lbl:
         a = fonts['sm'].render(ai_lbl, True, TEXT_DIM)
         surface.blit(a, a.get_rect(centerx=CX, top=y))
 
-    sep(panel.top + 286)
-
-    # ── 6. HISTORIQUE (zone flexible jusqu'aux raccourcis) ──
-    HIST_TOP    = panel.top + 294
-    HINTS_H     = 5 * 20 + 20   # 5 raccourcis × 20px + marge
-    HIST_BOTTOM = panel.bottom - HINTS_H
-
-    y = HIST_TOP
-    ht = fonts['sm'].render("Historique", True, TEXT_DIM)
-    surface.blit(ht, ht.get_rect(centerx=CX, top=y))
-    y += ht.get_height() + 4
-
-    # En-têtes colonnes
-    h0 = fonts['sm'].render("J1", True, P1_CLR)
-    h1 = fonts['sm'].render("J2", True, P2_CLR)
-    surface.blit(h0, (PADL + 10, y))
-    surface.blit(h1, (PADL + 112, y))
-    y += h0.get_height() + 2
-
-    history = state.get('history', [])
-    pairs, temp = [], []
-    for entry in history:
-        temp.append(entry)
-        if len(temp) == 2:
-            pairs.append(tuple(temp)); temp = []
-    if temp:
-        pairs.append((temp[0], None))
-
-    LINE_H = fonts['sm'].get_height() + 3
-    for pair in pairs[-5:]:
-        if y + LINE_H > HIST_BOTTOM:
-            break
-        t0 = fonts['sm'].render(pair[0][1] if pair[0] else "—", True, P1_CLR)
-        t1 = fonts['sm'].render(pair[1][1] if pair[1] else "—", True, P2_CLR)
-        surface.blit(t0, (PADL + 10, y))
-        surface.blit(t1, (PADL + 112, y))
-        y += LINE_H
-
-    sep(panel.bottom - HINTS_H)
-
-    # ── 7. RACCOURCIS (bas fixe) ───────────────────────
-    hints = [("B",    "Mode barrière"),
-             ("H",    "Rotation"),
-             ("R",    "Rejouer"),
-             ("ESC",  "Menu"),
-             ("?",    "Règles")]
-    y = panel.bottom - HINTS_H + 10
+    # ═══ 6. RACCOURCIS (bas) ══════════════════════════════
+    HINTS_H = 5 * 20 + 14
+    sep_line(panel.bottom - HINTS_H - 6)
+    hints = [("B",   "Barrière"),
+             ("H",   "Rotation"),
+             ("R",   "Rejouer"),
+             ("ESC", "Menu"),
+             ("?",   "Règles")]
+    y = panel.bottom - HINTS_H
     for key, desc in hints:
         k = fonts['sm'].render(f"[{key}]", True, ACCENT)
         d = fonts['sm'].render(desc, True, TEXT_DIM)
@@ -309,17 +350,28 @@ def draw_panel(surface: pygame.Surface, fonts: dict, state: dict):
 
 # ── Bandeau de victoire ───────────────────────
 def draw_winner_banner(surface: pygame.Surface, fonts: dict, winner: int):
-    color   = P1_CLR if winner == 0 else P2_CLR
-    overlay = pygame.Surface((BOARD_PX, 90), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 170))
-    ox = MARGIN
-    oy = MARGIN + BOARD_PX // 2 - 45
+    color  = P1_CLR if winner == 0 else P2_CLR
+    now    = pygame.time.get_ticks()
+    pulse  = 0.75 + 0.25 * math.sin(now / 400)
+    gold   = (int(220 * pulse), int(185 * pulse), int(40 * pulse))
+
+    overlay = pygame.Surface((BOARD_PX + 20, 110), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 200))
+    ox = MARGIN - 10
+    oy = MARGIN + BOARD_PX // 2 - 55
     surface.blit(overlay, (ox, oy))
 
-    msg = fonts['lg'].render(f"Joueur {winner + 1} a gagne !", True, color)
-    sub = fonts['sm'].render("Appuyez sur  R  pour rejouer", True, TEXT_DIM)
-    surface.blit(msg, msg.get_rect(centerx=ox + BOARD_PX // 2, top=oy + 10))
-    surface.blit(sub, sub.get_rect(centerx=ox + BOARD_PX // 2, top=oy + 58))
+    banner_rect = pygame.Rect(ox, oy, BOARD_PX + 20, 110)
+    pygame.draw.rect(surface, gold,  banner_rect, 2, border_radius=8)
+    pygame.draw.rect(surface, color, banner_rect.inflate(-6, -6), 1, border_radius=6)
+
+    cx   = ox + (BOARD_PX + 20) // 2
+    msg  = fonts['lg'].render(f"Joueur {winner + 1} a gagne !", True, gold)
+    sub  = fonts['md'].render("Félicitations !", True, color)
+    hint = fonts['sm'].render("R  rejouer  ·  ESC  menu", True, TEXT_DIM)
+    surface.blit(msg,  msg.get_rect(centerx=cx, top=oy + 8))
+    surface.blit(sub,  sub.get_rect(centerx=cx, top=oy + 54))
+    surface.blit(hint, hint.get_rect(centerx=cx, top=oy + 88))
 
 
 # ── Calcul de la position d'une barrière ──────

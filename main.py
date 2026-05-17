@@ -5,6 +5,7 @@
 # ─────────────────────────────────────────────
 import sys
 import threading
+import math
 import pygame
 from constants import *
 from renderer import (draw_board, draw_coordinates, draw_pawn,
@@ -51,42 +52,75 @@ def selection_screen(screen: pygame.Surface, fonts: dict) -> dict:
     W, H   = screen.get_size()
     CENTER = W // 2
 
-    def btn(surface, text, rect, active, fnt):
-        clr = ACCENT if active else TEXT_DIM
-        bg  = (50, 60, 40) if active else (30, 30, 46)
-        pygame.draw.rect(surface, bg,  rect, border_radius=8)
-        pygame.draw.rect(surface, clr, rect, 2, border_radius=8)
-        lbl = fnt.render(text, True, clr)
+    def btn(surface, text, rect, active, hover, fnt, dot_color=None):
+        if active:
+            bg, border_clr, text_clr, bw = (50, 65, 40), ACCENT, ACCENT, 2
+        elif hover:
+            bg, border_clr, text_clr, bw = BUTTON_HOVER_BG, TEXT_CLR, TEXT_CLR, 2
+        else:
+            bg, border_clr, text_clr, bw = (30, 30, 46), TEXT_DIM, TEXT_DIM, 1
+        pygame.draw.rect(surface, bg, rect, border_radius=8)
+        pygame.draw.rect(surface, border_clr, rect, bw, border_radius=8)
+        lbl = fnt.render(text, True, text_clr)
         surface.blit(lbl, lbl.get_rect(center=rect.center))
+        if dot_color:
+            pygame.draw.circle(surface, dot_color, (rect.left + 20, rect.centery), 8)
 
     while True:
+        now    = pygame.time.get_ticks()
+        mx, my = pygame.mouse.get_pos()
         screen.fill(BG)
 
-        # Titre
-        t = fonts['lg'].render("QUORIDOR", True, ACCENT)
+        # ── Étoiles décoratives ──
+        for _si in range(28):
+            _sx = (_si * 283) % (W - 40) + 20
+            _sy = (_si * 197) % (H - 40) + 20
+            _sa = max(0, min(255, int(12 + 18 * math.sin(now / 500 + _si * 1.3))))
+            _sr = 1 if _si % 3 != 0 else 2
+            _ss = pygame.Surface((_sr * 2 + 2, _sr * 2 + 2), pygame.SRCALPHA)
+            pygame.draw.circle(_ss, (180, 190, 255, _sa), (_sr + 1, _sr + 1), _sr)
+            screen.blit(_ss, (_sx - _sr, _sy - _sr))
+
+        # ── Titre animé ──
+        pulse     = 0.75 + 0.25 * math.sin(now / 700)
+        title_clr = (int(ACCENT[0] * pulse), int(ACCENT[1] * pulse), int(ACCENT[2] * pulse))
+        t = fonts['lg'].render("QUORIDOR", True, title_clr)
         screen.blit(t, t.get_rect(centerx=CENTER, top=40))
-        sub = fonts['sm'].render("Université de Rouen  —  M1 GIL-ITA", True, TEXT_DIM)
+        sub = fonts['sm'].render("Université de Rouen  —  M1 GIL", True, TEXT_DIM)
         screen.blit(sub, sub.get_rect(centerx=CENTER, top=86))
 
         y = 140
         # ── Mode ──
+        card_mode = pygame.Rect(CENTER - 175, y - 8, 350, 40 + len(modes) * 52 + 4)
+        pygame.draw.rect(screen, SECTION_BG, card_mode, border_radius=10)
+        pygame.draw.rect(screen, (40, 42, 65), card_mode, 1, border_radius=10)
         lbl = fonts['md'].render("Mode de jeu", True, TEXT_CLR)
         screen.blit(lbl, lbl.get_rect(centerx=CENTER, top=y))
         y += 40
+        mode_rects = []
         for i, m in enumerate(modes):
             r = pygame.Rect(CENTER - 160, y, 320, 42)
-            btn(screen, m, r, sel_mode == i, fonts['md'])
+            mode_rects.append(r)
+            btn(screen, m, r, sel_mode == i, r.collidepoint(mx, my), fonts['md'])
             y += 52
 
         # ── Niveau (seulement si vs IA) ──
+        level_rects = []
+        side_rects  = []
         if sel_mode == 1:
             y += 10
+            card_ia = pygame.Rect(CENTER - 175, y - 8,
+                                  350, 44 + len(levels) * 48 + 50 + len(sides) * 48 + 4)
+            pygame.draw.rect(screen, SECTION_BG, card_ia, border_radius=10)
+            pygame.draw.rect(screen, (40, 42, 65), card_ia, 1, border_radius=10)
             lbl = fonts['md'].render("Niveau IA", True, TEXT_CLR)
             screen.blit(lbl, lbl.get_rect(centerx=CENTER, top=y))
             y += 40
             for i, lv in enumerate(levels):
                 r = pygame.Rect(CENTER - 140, y, 280, 38)
-                btn(screen, lv.capitalize(), r, sel_level == i, fonts['sm'])
+                level_rects.append(r)
+                btn(screen, lv.capitalize(), r, sel_level == i,
+                    r.collidepoint(mx, my), fonts['sm'])
                 y += 48
 
             y += 6
@@ -96,58 +130,50 @@ def selection_screen(screen: pygame.Surface, fonts: dict) -> dict:
             for i, s in enumerate(sides):
                 clr_dot = P1_CLR if i == 0 else P2_CLR
                 r = pygame.Rect(CENTER - 160, y, 320, 38)
-                btn(screen, s, r, sel_side == i, fonts['sm'])
-                pygame.draw.circle(screen, clr_dot,
-                                   (CENTER - 140, y + 19), 8)
+                side_rects.append(r)
+                btn(screen, s, r, sel_side == i, r.collidepoint(mx, my),
+                    fonts['sm'], dot_color=clr_dot)
                 y += 48
 
         # ── Bouton Jouer ──
         y += 16
-        play_r = pygame.Rect(CENTER - 120, y, 240, 50)
-        pygame.draw.rect(screen, ACCENT, play_r, border_radius=10)
-        pl = fonts['md'].render("▶  JOUER", True, BG)
-        screen.blit(pl, pl.get_rect(center=play_r.center))
+        play_r   = pygame.Rect(CENTER - 130, y, 260, 54)
+        play_hov = play_r.collidepoint(mx, my)
+        play_bg  = (min(255, ACCENT[0] + 30), min(255, ACCENT[1] + 30),
+                    min(255, ACCENT[2] + 30)) if play_hov else ACCENT
+        pygame.draw.rect(screen, (10, 12, 20), play_r.move(0, 4), border_radius=12)
+        pygame.draw.rect(screen, play_bg, play_r, border_radius=12)
+        pygame.draw.rect(screen, (255, 255, 255) if play_hov else (180, 180, 180),
+                         play_r, 2, border_radius=12)
+        icon_s = fonts['md'].render("▶", True, BG)
+        lbl_s  = fonts['md'].render("JOUER", True, BG)
+        total_w = icon_s.get_width() + 10 + lbl_s.get_width()
+        ix = play_r.centerx - total_w // 2
+        iy = play_r.centery - icon_s.get_height() // 2
+        screen.blit(icon_s, (ix, iy))
+        screen.blit(lbl_s,  (ix + icon_s.get_width() + 10, iy))
 
         pygame.display.flip()
         clock.tick(60)
 
-        mx, my = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit()
-
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # Refaire le calcul des rects (même logique)
-                ry = 180
-                for i in range(len(modes)):
-                    r = pygame.Rect(CENTER - 160, ry, 320, 42)
+                for i, r in enumerate(mode_rects):
                     if r.collidepoint(mx, my):
                         sel_mode = i
-                    ry += 52
-
-                if sel_mode == 1:
-                    ry += 50
-                    for i in range(len(levels)):
-                        r = pygame.Rect(CENTER - 140, ry, 280, 38)
-                        if r.collidepoint(mx, my):
-                            sel_level = i
-                        ry += 48
-                    ry += 46
-                    for i in range(len(sides)):
-                        r = pygame.Rect(CENTER - 160, ry, 320, 38)
-                        if r.collidepoint(mx, my):
-                            sel_side = i
-                        ry += 48
-                    ry += 22
-                else:
-                    ry += 16
-
-                play_r2 = pygame.Rect(CENTER - 120, ry, 240, 50)
-                if play_r2.collidepoint(mx, my) or play_r.collidepoint(mx, my):
+                for i, r in enumerate(level_rects):
+                    if r.collidepoint(mx, my):
+                        sel_level = i
+                for i, r in enumerate(side_rects):
+                    if r.collidepoint(mx, my):
+                        sel_side = i
+                if play_r.collidepoint(mx, my):
                     depth     = list(LEVELS.values())[sel_level]
-                    ai_player = 1 - sel_side   # si humain=J1 → IA=J2(1)
+                    ai_player = 1 - sel_side
                     return {
                         'mode':      modes[sel_mode],
                         'level':     depth,
@@ -162,7 +188,7 @@ def selection_screen(screen: pygame.Surface, fonts: dict) -> dict:
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Quoridor — M1 GIL-ITA | Université de Rouen")
+    pygame.display.set_caption("Quoridor — M1 GIL | Université de Rouen")
     icon = pygame.Surface((32, 32)); icon.fill(ACCENT)
     pygame.display.set_icon(icon)
 
